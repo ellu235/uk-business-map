@@ -1,510 +1,129 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>英国企业参访地图（实时交通规划跳转）</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet 样式 -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        /* 引入Inter字体 */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f1f5f9; /* Slate 100 */
-        }
-        #map {
-            height: 70vh; /* 为底部的交通面板腾出空间 */
-            width: 100%;
-            border-radius: 0.5rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            will-change: transform;
-        }
-        
-        /* 自定义标记样式：轻量级的彩色圆点 */
-        .custom-marker-dot {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            border: 3px solid #fff;
-            box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
-            cursor: pointer;
-            transition: transform 0.1s ease-out;
-        }
-        .custom-marker-dot:hover {
-            transform: scale(1.3);
-        }
-
-        /* 优先级颜色定义 */
-        .marker-p1 { background-color: #ef4444; } /* Red: P1 顾客 */
-        .marker-p2 { background-color: #3b82f6; } /* Blue: P2 重点顾客 */
-        .marker-p3 { background-color: #10b981; } /* Green: P3 其他 */
-
-        /* 选中标记样式 */
-        .marker-selected { 
-            border: 4px solid #f97316; /* Orange 500 */
-            transform: scale(1.5) !important;
-        }
-        
-        /* 弹出窗口样式 (Tailwind-like) */
-        .leaflet-popup-content-wrapper {
-            border-radius: 0.5rem;
-            padding: 0;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-        }
-        .leaflet-popup-content {
-            padding: 1rem;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        /* 自定义弹窗样式 */
-        #custom-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        .modal-content {
-            background-color: white;
-            padding: 24px;
-            border-radius: 12px;
-            max-width: 400px;
-            width: 90%;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            text-align: center;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>英国企业参访地图（含住宿点）</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    #map { height: 90vh; width: 100%; border-radius: 0.5rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    .custom-marker-dot { width:16px;height:16px;border-radius:50%;border:3px solid #fff;cursor:pointer;transition:transform 0.1s ease-out;}
+    .custom-marker-dot:hover{transform:scale(1.3);}
+    .marker-p1{background-color:#ef4444;}
+    .marker-p2{background-color:#3b82f6;}
+    .marker-p3{background-color:#10b981;}
+  </style>
 </head>
 <body class="p-4 md:p-8">
-    <div class="max-w-7xl mx-auto">
-        <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-indigo-500 pb-2">
-            英国企业参访地点可视化
-            <span class="text-sm font-normal text-gray-500 ml-2"> (点击任意两点，规划实时交通)</span>
-        </h1>
-        
-        <!-- 优先级图例 -->
-        <div class="flex flex-wrap gap-6 mb-6 text-sm font-semibold">
-            <div class="flex items-center">
-                <div class="custom-marker-dot marker-p1 mr-2 flex-shrink-0"></div> P1: 顾客 (高优先级)
-            </div>
-            <div class="flex items-center">
-                <div class="custom-marker-dot marker-p2 mr-2 flex-shrink-0"></div> P2: 重点顾客 (中优先级)
-            </div>
-            <div class="flex items-center">
-                <div class="custom-marker-dot marker-p3 mr-2 flex-shrink-0"></div> P3: 其他 (一般优先级)
-            </div>
-        </div>
+  <div class="max-w-7xl mx-auto">
+    <h1 class="text-3xl font-bold text-gray-800 mb-6 border-b-2 border-indigo-500 pb-2">
+      英国企业参访地图（含住宿点）
+    </h1>
+    <div id="map"></div>
+  </div>
 
-        <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    let mapInstance;
 
-        <!-- 交通规划面板 -->
-        <div id="transport-panel" class="mt-8 bg-white p-6 rounded-xl shadow-2xl border-t-4 border-indigo-500 transition-all duration-300">
-            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-4.5-5.5a.5.5 0 01.5-.5h7a.5.5 0 010 1H6a.5.5 0 01-.5-.5zm0-4a.5.5 0 01.5-.5h7a.5.5 0 010 1H6a.5.5 0 01-.5-.5z" clip-rule="evenodd" />
-                </svg>
-                参访交通规划 (跳转至 Google Maps)
-            </h2>
-            
-            <!-- 选中的地点 -->
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-3 mb-4">
-                <div class="mb-2 md:mb-0">
-                    <p class="text-sm font-medium text-gray-500">起点 (A): <span id="start-location" class="text-gray-800 font-semibold">- 待定 -</span></p>
-                    <p class="text-sm font-medium text-gray-500">终点 (B): <span id="end-location" class="text-gray-800 font-semibold">- 待定 -</span></p>
-                </div>
-                <button id="reset-button" class="bg-red-100 text-red-600 px-3 py-1 text-sm font-medium rounded-full hover:bg-red-200 transition-colors hidden" onclick="resetSelection()">重置选择</button>
-            </div>
+    const GEOCODE_LOOKUP = {
+      "LONDON": [51.5072, -0.1276],
+      "BIRMINGHAM": [52.4862, -1.8904],
+      "MANCHESTER": [53.4808, -2.2426],
+      "LEEDS": [53.8008, -1.5491],
+      "LUTON": [51.8789, -0.4172],
+      "LEICESTER": [52.6369, -1.1398],
+      "LIVERPOOL": [53.4084, -2.9916],
+      "BRISTOL": [51.4545, -2.5879],
+      "WARRINGTON": [53.3888, -2.5802]
+    };
 
-            <!-- 规划按钮区域 -->
-            <div id="planning-buttons" class="hidden">
-                <p class="text-gray-600 mb-3 font-medium">请选择出行方式：</p>
-                <div class="flex flex-wrap gap-4">
-                    <button 
-                        class="flex items-center bg-indigo-600 text-white px-5 py-2 rounded-lg font-semibold shadow-md hover:bg-indigo-700 transition-all duration-200"
-                        onclick="openGoogleMaps('driving')">
-                        🚗 驾车路线 (Google Maps)
-                    </button>
-                    <button 
-                        class="flex items-center bg-green-600 text-white px-5 py-2 rounded-lg font-semibold shadow-md hover:bg-green-700 transition-all duration-200"
-                        onclick="openGoogleMaps('transit')">
-                        🚌 公共交通 (Google Maps)
-                    </button>
-                </div>
-                <p class="text-xs text-gray-500 mt-4 italic">
-                    点击按钮后，将会在新窗口打开 Google Maps 实时路线规划。
-                </p>
-            </div>
-            
-            <!-- 初始提示 -->
-            <p id="initial-prompt" class="text-gray-600 italic font-medium">请在地图上连续点击两个标记点，以规划A到B的交通。</p>
-        </div>
-    </div>
+    const COMPANIES = [
+      { name: "Amcor Packaging UK Ltd.", city: "Bristol", address: "83 Tower Road North, BS30 8XP", priority: 2 },
+      { name: "Clifton Packaging Group Ltd.", city: "Leicester", address: "Meridian Business Park, Leicester", priority: 2 },
+      { name: "Esterform Packaging", city: "Leeds", address: "Royds Farm Rd, Leeds", priority: 1 },
+      { name: "Alpla UK", city: "Warrington", address: "Stonecross Business Park, Warrington", priority: 2 },
+      { name: "Logoplaste UK", city: "London", address: "Hedley Ave, Grays RM20 4AL", priority: 3 },
+      { name: "Centriforce Ltd", city: "Liverpool", address: "14-16 Derby Road, Bootle, Liverpool", priority: 2 },
+      { name: "Bell Packaging Ltd.", city: "Luton", address: "Airport Way, Luton", priority: 2 },
+      { name: "Parkside Flex", city: "Leeds", address: "Tyler Close, Normanton", priority: 2 },
+      { name: "Coral Products", city: "Manchester", address: "Haydock Industrial Estate, WA11 9TP", priority: 2 }
+    ];
 
-    <!-- 自定义弹窗 (替代 alert) -->
-    <div id="custom-modal">
-        <div class="modal-content">
-            <h3 class="text-xl font-bold text-red-600 mb-3">注意</h3>
-            <p id="modal-message" class="text-gray-700 mb-5">消息内容</p>
-            <button class="bg-indigo-500 text-white px-4 py-2 rounded-lg hover:bg-indigo-600" onclick="hideCustomAlert()">确定</button>
-        </div>
-    </div>
+    const P1 = "#ef4444";
+    const P2 = "#3b82f6";
+    const P3 = "#10b981";
 
-    <!-- Leaflet JS CDN -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    const initializeMap = () => {
+      mapInstance = L.map('map').setView([54.0, -2.0], 6);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+      }).addTo(mapInstance);
 
-    <script>
-        // 原始 CSV 格式数据 (与上一个文件保持一致)
-        const rawData = `名字	主营业务	网址	地址	备注	负责人	营业时间
-Esterform Packaging 	-	-	Royds Farm Rd, Holbeck, Leeds LS12 6DX	顾客	嘎姐	
-ORANGE & ORANGE LTD	-	-	24 BELFRY LANE, COLLINGTREE, NORTHAMPTON, NN4 0PB	顾客	嘎姐	
-Sharpak	-	-	Aylesham Ind Est, Aylesham, Kent, CT3 3EF, UK	顾客	Desmond	
-Bell Packaging Ltd.	环保可回收塑料包装解决方案的制造与供应	http://www.bellpackaging.com	Unit 8 Barratt Industrial Park, Airport Way, Luton, Bedfordshire, LU2 9NH	有进口记录	+44 1582459292	9 am–5 am(应该是官网手误）
-Amcor Packaging Uk Ltd.	专注于为食品、饮料、医药及个人护理等行业设计并生产可持续的柔性包装（如高阻隔薄膜、可回收收缩袋）和硬包装（如轻量化 PET 瓶、医药泡罩容器）	https://www.amcor.com/	83 Tower Road North, BS30 8XP (headquater); 4 Sallow Rd, Corby NN17 5JX, United Kingdom (Amcor Corby, T/A RPC Containers LTD); Haslingden Rd, Blackburn BB1 2PX, United Kingdom (Amcor Blackburn)	澳洲开发中	+441179753200	8 am–5 pm (Fri3pm)
-Wrapid Mfg Ltd.	英国食品工业包装薄膜领先分销商，专注于热封盖膜（特别是Mylar®品牌）、层压薄膜、聚酯袋和可烘烤表皮薄膜，为食品加工和包装行业提供耐热盖膜解决方案	https://www.wrapid.co.uk	250 Thornton Rd, Bradford BD1 2LB, United Kingdom	有进口记录	+441274220220	8:15am-5:15pm 周五不开
-HotPack Packaging UK LTD	食品包装制造（如容器、托盘）	http://h-packglobal.com	Hotpack Complex, Davy Way, Llay, Wrexham LL12 0PG, United Kingdom	已签阿联酋	+441978855595	9 am–5:30 pm
-Modern Packaging Ltd.	柔性包装印刷、层压、分切和复卷服务，以及特种薄膜产品（如穿孔薄膜、纸张层压和可回收薄膜）	https://modern-packaging.co.uk	Ascot Rd, Pershore WR10 2JJ, United Kingdom	有进口记录	+44 1242262002	-
-Bell Packaging Ltd.	环保可回收塑料包装解决方案的制造与供应	http://www.bellpackaging.com	Unit 8 Barratt Industrial Park, Airport Way, Luton, Bedfordshire, LU2 9NH	有进口记录	+44 1582459292	9 am–5 am
-Clifton Packaging Group Ltd.	柔性包装薄膜和包装袋制造	http://www.cliftonpackaging.co.uk	Meridian Business Park, Centurion Way, Leicester, LE19 1WH, UK	有进口记录	+44 (0)116 289 3355	9 am–5 pm
-Celli Uk	大量进口pet但不直接使用，设计、制造和提供创新的饮料分配与 dispensing 系统及解决方案	https://celli.com	Thirsk Industrial Park, York Rd, Thirsk YO7 3BX, United Kingdom	有进口记录	+441423324555	7:30 am–4:30 pm
-Perimeter General Trading Llc	包装盖膜解决方案	https://www.perimeterfc.com	Meridian Business Park, Centurion Way, LE19 1WH, UK	有进口记录		7:30 am–4:30 pm
-Sappi Rockwell Solutions Ltd.	PET瓶回收和rPET制造	https://www.rockwellsolutions.co.uk	Brunel Road, Dundee DD2 4TG, Scotland, UK	有进口记录	+44 1382622122	9 am–5 pm(Fri2pm)
-Staeger Clear Packaging Ltd.	欧洲领先的特定应用透明和热成型塑料包装解决方案提供商，专注于糖果、食品、化妆品、纺织品/非食品、技术工业和汽车行业的泡罩、翻盖、托盘、插入件、工件载体和混合包装	http://staegerclear.co.uk	Units 6, Bermuda Industrial Estate, 8 Buckingham Cl, St Georges Way, Nuneaton CV10 7JT, United Kingdom	有进口记录	+44 24 76 581197	8:30 am–4:30 pm
-Alpla UK	塑料包装解决方案	https://www.alpla.com/en	Unit 9, The Stonecross, Stonecross Business Park, Yew Tree Way, Golborne, Warrington WA3 3GY, United Kingdom (Headquater); Lasborough Rd, Kingston, Milton Keynes MK10 0AB, United Kingdom (Official address); 	有进口记录	+44 8456447544	
-Logoplaste UK	塑料包装设计和制造	https://www.logoplaste.com/	Hedley Ave, Grays RM20 4AL, United Kingdom	大公司，主公司usa，近期只买新料	+441189719770	-
-Kempner Ltd.	收缩包装和可持续包装解决方案	https://www.kempner.co.uk	498-500HONEYPOT LANE STANMORE MIDDLESEX MDDSX HA7 1JZ UK TECONTACTO MR. RICHAR JANKEL		+44 2089525262	9 am–5:30 pm
-Pont Packaging Ltd	买成品，可持续包装解决方案全球合作伙伴，专注于为维生素与运动营养、化学品、非处方药/药品、个人护理、食品饮料、宠物护理等行业提供玻璃罐、玻璃瓶、塑料罐、塑料瓶、瓶盖及配件	https://www.ponteurope.com/	2 Steuber Drive, Irlam, Manchester M44 5AL, UK	有进口记录	+44 161 874 1930	8:30 am–4 pm
-Kingfisher Packaging Ltd.	英国综合性包装材料供应商，提供纸箱、胶带、保护性包装材料、托盘缠绕膜、聚乙烯产品、邮政包装、包装机械、捆扎带、纸制品、标签及定制包装等全系列产品	http://www.kingfisherpackaging.com	Pleamore Cross Business Park, Wrangway, Wellington, Somerset, TA21 9AQ, UK	有进口记录	+44 (0)1823 653400	8:30 am–4:30 pm
-JACKODUR® by BEWI UK	XPS做保温板，也做保丽龙盒子装冷冻	https://bewi.com/products/jackodur?lang=en-gb	Unit A, Rudford Industrial Estate, Nr Arundel, West Sussex BN+B2418 0BD（南部office-head office）;Boothferry Works, Howden, East Riding of Yorkshire DN14 7EA（北部office）	陌拜，由发过开发信	Kay	8:30 am–4 pm
-Alchimica Building Chemicals	XPS做保温板，也有其他家具项目（不太相关）	https://www.alchimica.com/en	Unit 2, Dairy Park, Spring Gardens, Whitland SA34 0HN英国	陌拜，由发过开发信	Kay	8:30 am–5 pm
-lvf		https://www.lvfpackaging.com/contact/	Hunslet Business Park, 4 National Rd, Leeds LS10 1TD, United Kingdom	顾客	嘎姐	8am - 5:30pm`;
+      // 添加公司标记
+      COMPANIES.forEach(c => {
+        const coords = GEOCODE_LOOKUP[c.city.toUpperCase()];
+        if (!coords) return;
+        const color = c.priority === 1 ? P1 : c.priority === 2 ? P2 : P3;
+        const icon = L.divIcon({
+          html: `<div class="custom-marker-dot" style="background-color:${color};"></div>`,
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
+        });
+        L.marker(coords, { icon }).bindPopup(`<b>${c.name}</b><br>${c.address}`).addTo(mapInstance);
+      });
 
-        /**
-         * 模拟地理编码：根据地址中的城市/区域获取近似的经纬度。
-         */
-        const GEOCODE_LOOKUP = {
-            "Leeds LS12 6DX": [53.7963, -1.5492, "Leeds"], // Esterform Packaging
-            "NORTHAMPTON, NN4 0PB": [52.2359, -0.8920, "Northampton"], // ORANGE & ORANGE LTD
-            "Kent, CT3 3EF": [51.3283, 1.1513, "Kent"], // Sharpak
-            "Luton, Bedfordshire, LU2 9NH": [51.8789, -0.4172, "Luton"], // Bell Packaging Ltd.
-            "83 Tower Road North, BS30 8XP": [51.4545, -2.5879, "Bristol"], // Amcor Bristol HQ
-            "4 Sallow Rd, Corby NN17 5JX": [52.4939, -0.6865, "Corby"], // Amcor Corby
-            "Blackburn BB1 2PX": [53.7485, -2.4820, "Blackburn"], // Amcor Blackburn
-            "250 Thornton Rd, Bradford BD1 2LB": [53.7997, -1.7516, "Bradford"], // Wrapid Mfg Ltd.
-            "Davy Way, Llay, Wrexham LL12 0PG": [53.0560, -3.0068, "Wrexham"], // HotPack Packaging UK LTD
-            "Ascot Rd, Pershore WR10 2JJ": [52.1264, -2.0076, "Pershore"], // Modern Packaging Ltd.
-            "Leicester, LE19 1WH": [52.6333, -1.1333, "Leicester"], // Clifton Packaging & Perimeter
-            "Thirsk YO7 3BX": [54.2333, -1.3333, "Thirsk"], // Celli Uk
-            "Dundee DD2 4TG, Scotland": [56.4620, -2.9707, "Dundee"], // Sappi Rockwell Solutions Ltd.
-            "Nuneaton CV10 7JT": [52.5208, -1.4646, "Nuneaton"], // Staeger Clear Packaging Ltd.
-            "Warrington WA3 3GY": [53.3888, -2.5802, "Warrington"], // Alpla UK Warrington
-            "Milton Keynes MK10 0AB": [52.0400, -0.7594, "Milton Keynes"], // Alpla UK Milton Keynes
-            "Grays RM20 4AL": [51.4754, 0.3013, "Grays"], // Logoplaste UK
-            "MIDDLESEX MDDSX HA7 1JZ": [51.6190, -0.3204, "Stanmore"], // Kempner Ltd.
-            "Irlam, Manchester M44 5AL": [53.4560, -2.4171, "Manchester"], // Pont Packaging Ltd
-            "Wellington, Somerset, TA21 9AQ": [50.9701, -3.2384, "Wellington"], // Kingfisher Packaging Ltd.
-            "Arundel, West Sussex BN+B2418 0BD": [50.8550, -0.5529, "Arundel"], // JACKODUR® South
-            "Howden, East Riding of Yorkshire DN14 7EA": [53.7540, -0.8650, "Howden"], // JACKODUR® North
-            "Whitland SA34 0HN": [51.7850, -4.6200, "Whitland"], // Alchimica Building Chemicals
-            "Leeds LS10 1TD": [53.7788, -1.5316, "Leeds"], // lvf
-        };
-        
-        // 优先级定义
-        const P1_COMPANIES = ["Esterform Packaging", "ORANGE & ORANGE LTD", "Sharpak", "lvf", "JACKODUR® by BEWI UK"];
-        const P2_COMPANIES = ["Bell Packaging Ltd.", "Amcor Packaging Uk Ltd.", "Wrapid Mfg Ltd.", "HotPack Packaging UK LTD", "Modern Packaging Ltd.", "Clifton Packaging Group Ltd.", "Celli Uk", "Perimeter General Trading Llc", "Sappi Rockwell Solutions Ltd.", "Staeger Clear Packaging Ltd.", "Alpla UK"];
+      // 添加住宿点
+      addAccommodations();
+    };
 
-        function getPriority(companyName) {
-            const name = companyName.trim();
-            if (P1_COMPANIES.includes(name)) {
-                return { level: 1, colorClass: 'marker-p1' };
-            }
-            if (P2_COMPANIES.includes(name)) {
-                return { level: 2, colorClass: 'marker-p2' };
-            }
-            return { level: 3, colorClass: 'marker-p3' };
+    const addAccommodations = () => {
+      const accommodations = [
+        {
+          name: "Premier Inn London City (Aldgate)",
+          address: "66 Alie St, London E1 8PX, UK",
+          link: "https://www.premierinn.com/gb/en/hotels/england/greater-london/london/london-city-aldgate.html",
+          coords: [51.5136, -0.0725]
+        },
+        {
+          name: "Travelodge Birmingham Central",
+          address: "230 Broad St, Birmingham B15 1AY, UK",
+          link: "https://www.travelodge.co.uk/hotels/12/Birmingham-Central-hotel",
+          coords: [52.4763, -1.9115]
+        },
+        {
+          name: "Holiday Inn Express Manchester City Centre",
+          address: "Oxford Rd, Manchester M1 5QA, UK",
+          link: "https://www.ihg.com/holidayinnexpress/hotels/gb/en/manchester/mancc/hoteldetail",
+          coords: [53.4741, -2.2382]
         }
-        
-        // 全局状态管理
-        let mapInstance;
-        let selectedMarkers = [];
-        let markerLayers = [];
-        let currentStartItem = null; // 用于存储起点数据
-        let currentEndItem = null;   // 用于存储终点数据
+      ];
 
-        /**
-         * 替换 alert() 的自定义弹窗
-         */
-        function showCustomAlert(message) {
-            document.getElementById('modal-message').textContent = message;
-            document.getElementById('custom-modal').style.display = 'flex';
-        }
+      const hotelIcon = L.icon({
+        iconUrl: "./59eafc9f-fc25-463f-9ec8-c8040d679b42.png",
+        iconSize: [32, 32],
+        iconAnchor: [16, 32],
+        popupAnchor: [0, -28]
+      });
 
-        function hideCustomAlert() {
-            document.getElementById('custom-modal').style.display = 'none';
-        }
+      accommodations.forEach(hotel => {
+        const popupContent = `
+          <div class="p-3 text-sm">
+            <h3 class="text-lg font-bold text-orange-600 mb-2">${hotel.name}</h3>
+            <p><strong>地址:</strong> ${hotel.address}</p>
+            <p><a href="${hotel.link}" target="_blank" class="text-blue-500 hover:underline">查看详情</a></p>
+          </div>`;
+        L.marker(hotel.coords, { icon: hotelIcon })
+          .bindPopup(popupContent)
+          .addTo(mapInstance);
+      });
+    };
 
-
-        /**
-         * 重新设置选择
-         */
-        function resetSelection() {
-            // 清除选中标记的样式
-            selectedMarkers.forEach(marker => {
-                // 还原图标，移除 marker-selected 类
-                const currentIconHtml = marker.getIcon().options.html;
-                const newIconHtml = currentIconHtml.replace(' marker-selected">', '">');
-
-                marker.setIcon(L.divIcon({
-                    className: 'custom-marker',
-                    html: newIconHtml,
-                    iconSize: [22, 22],
-                    iconAnchor: [11, 11],
-                    popupAnchor: [0, -5]
-                }));
-            });
-            
-            selectedMarkers = [];
-            currentStartItem = null;
-            currentEndItem = null;
-            document.getElementById('start-location').textContent = '- 待定 -';
-            document.getElementById('end-location').textContent = '- 待定 -';
-            document.getElementById('planning-buttons').classList.add('hidden');
-            document.getElementById('initial-prompt').classList.remove('hidden');
-            document.getElementById('reset-button').classList.add('hidden');
-        }
-
-        /**
-         * 标记点击处理函数
-         * @param {Object} item - 标记数据
-         * @param {L.Marker} marker - Leaflet 标记实例
-         */
-        function handleMarkerClick(item, marker) {
-            // 确保不重复点击同一个点
-            if (selectedMarkers.length === 1 && selectedMarkers[0] === marker) {
-                return;
-            }
-
-            // 清理旧的选中状态
-            if (selectedMarkers.length === 2) {
-                resetSelection();
-            }
-
-            // 标记当前点击的点为选中状态
-            const currentIconHtml = marker.getIcon().options.html;
-            
-            // 确保添加 marker-selected 类
-            let newIconHtml = currentIconHtml;
-            if (!currentIconHtml.includes('marker-selected')) {
-                 // 找到类名结束的双引号前，插入 marker-selected
-                newIconHtml = currentIconHtml.replace('">', ' marker-selected">');
-            }
-
-            marker.setIcon(L.divIcon({
-                className: 'custom-marker',
-                html: newIconHtml,
-                iconSize: [22, 22],
-                iconAnchor: [11, 11],
-                popupAnchor: [0, -5]
-            }));
-            
-            selectedMarkers.push(marker);
-            
-            const startLocEl = document.getElementById('start-location');
-            const endLocEl = document.getElementById('end-location');
-            const resetButton = document.getElementById('reset-button');
-            const initialPrompt = document.getElementById('initial-prompt');
-            const planningButtons = document.getElementById('planning-buttons');
-            
-            if (selectedMarkers.length === 1) {
-                // 选择了起点
-                currentStartItem = item;
-                startLocEl.textContent = `${item.name} (${item.locationName})`;
-                endLocEl.textContent = '- 待定 -';
-                resetButton.classList.remove('hidden');
-                planningButtons.classList.add('hidden');
-                initialPrompt.classList.remove('hidden');
-            } else if (selectedMarkers.length === 2) {
-                // 选择了终点
-                currentEndItem = item;
-                
-                endLocEl.textContent = `${item.name} (${item.locationName})`;
-                initialPrompt.classList.add('hidden');
-                planningButtons.classList.remove('hidden');
-            }
-        }
-
-        /**
-         * 根据选中的起点和终点，跳转到 Google Maps 进行路线规划。
-         * @param {string} mode - 交通模式: 'driving' 或 'transit'
-         */
-        function openGoogleMaps(mode) {
-            if (!currentStartItem || !currentEndItem) {
-                showCustomAlert("请先选择地图上的起点和终点！"); 
-                return;
-            }
-            
-            // 使用 full address 或 name + locationName 组合作为起点和终点
-            // 使用地址更精确
-            const origin = currentStartItem.address; 
-            const destination = currentEndItem.address;
-
-            // 构造 Google Maps Directions URL
-            const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=${mode}`;
-            
-            // 在新窗口中打开
-            window.open(url, "_blank");
-        }
-
-        /**
-         * 解析原始数据并扁平化为可绘制标记的列表。
-         */
-        function parseData(data) {
-            const lines = data.trim().split('\n');
-            const headers = lines[0].split('\t').map(h => h.trim());
-            const markers = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split('\t').map(v => v.trim());
-                if (values.length !== headers.length) continue;
-
-                const companyData = {};
-                headers.forEach((header, index) => {
-                    companyData[header] = values[index] || '-';
-                });
-
-                const { 
-                    名字: name, 
-                    地址: rawAddress, 
-                    ...details 
-                } = companyData;
-                
-                const addresses = rawAddress.split(';').map(addr => addr.trim()).filter(addr => addr.length > 0);
-
-                const priorityInfo = getPriority(name);
-
-                addresses.forEach(address => {
-                    let coords = null;
-                    let locationName = address;
-
-                    // 尝试匹配地址片段到 GEOCODE_LOOKUP
-                    for (const key in GEOCODE_LOOKUP) {
-                        if (address.includes(key)) {
-                            const [lat, lng, locName] = GEOCODE_LOOKUP[key];
-                            coords = [lat, lng];
-                            locationName = locName;
-                            break;
-                        }
-                    }
-
-                    if (coords) {
-                        markers.push({
-                            name,
-                            address,
-                            coords,
-                            locationName,
-                            ...details,
-                            priority: priorityInfo 
-                        });
-                    }
-                });
-            }
-
-            return markers;
-        }
-
-        /**
-         * 创建 Leaflet 地图和标记。
-         */
-        function initializeMap() {
-            mapInstance = L.map('map', {
-                zoomSnap: 0.5,
-                zoomDelta: 0.5
-            }).setView([54.0, -2.0], 6); 
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-                updateWhenIdle: true 
-            }).addTo(mapInstance);
-
-            const allMarkersData = parseData(rawData);
-            const markerGroup = L.featureGroup();
-
-            allMarkersData.forEach(item => {
-                const { name, coords, priority, ...details } = item;
-                const [lat, lng] = coords;
-                
-                // 1. 创建自定义标记图标（彩色圆点）
-                const customIcon = L.divIcon({
-                    className: 'custom-marker',
-                    html: `<div class="custom-marker-dot ${priority.colorClass}"></div>`,
-                    iconSize: [22, 22],
-                    iconAnchor: [11, 11],
-                    popupAnchor: [0, -5]
-                });
-
-                // 2. 格式化弹出窗口内容
-                const websiteLink = details['网址'] && details['网址'] !== '-' 
-                    ? `<a href="${details['网址']}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline transition-colors duration-150">访问网站</a>`
-                    : '暂无';
-                
-                const priorityText = priority.level === 1 ? '高优先级 P1 (顾客)' : 
-                                     priority.level === 2 ? '中优先级 P2 (重点顾客)' : '一般优先级 P3 (其他)';
-
-                const popupContent = `
-                    <div class="p-3 text-sm">
-                        <h3 class="text-lg font-bold text-indigo-700 mb-2">${name}</h3>
-                        <p class="font-semibold text-gray-700 mb-2">📌 ${item.locationName} - ${priorityText}</p>
-                        <div class="space-y-1">
-                            <p><strong>主营业务:</strong> ${details['主营业务']}</p>
-                            <p><strong>地址:</strong> ${item.address}</p>
-                            <p><strong>网址:</strong> ${websiteLink}</p>
-                            <p><strong>负责人:</strong> ${details['负责人']}</p>
-                            <p><strong>营业时间:</strong> ${details['营业时间']}</p>
-                            <p><strong>备注:</strong> <span class="text-orange-600 font-medium">${details['备注']}</span></p>
-                        </div>
-                    </div>
-                `;
-
-                // 3. 创建标记、绑定数据和点击事件
-                const marker = L.marker([lat, lng], { 
-                    icon: customIcon,
-                    title: `${name} (${item.locationName})`,
-                    itemData: item // 将数据附加到标记对象上
-                });
-                
-                marker.bindPopup(popupContent, { 
-                    maxWidth: 350, 
-                    minWidth: 200 
-                });
-
-                // 添加点击事件，用于交通规划
-                marker.on('click', function() {
-                    handleMarkerClick(item, marker);
-                });
-
-                markerLayers.push(marker);
-                markerGroup.addLayer(marker);
-            });
-
-            markerGroup.addTo(mapInstance);
-
-            if (markerGroup.getLayers().length > 0) {
-                mapInstance.fitBounds(markerGroup.getBounds().pad(0.1));
-            } else {
-                mapInstance.setView([54.0, -2.0], 6);
-            }
-        }
-
-        window.onload = initializeMap;
-    </script>
+    document.addEventListener('DOMContentLoaded', initializeMap);
+  </script>
 </body>
 </html>
